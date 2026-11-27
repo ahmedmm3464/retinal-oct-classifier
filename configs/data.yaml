@@ -1,3 +1,5 @@
 dataset:
   kaggle_id: paultimothymooney/kermany2018
   raw_dir: data/raw
+  # The folder name ends with a space. The second copy holds identical images.
+  image_dir: "data/raw/OCT2017 "
