@@ -278,3 +278,30 @@ def make_dataset(table, config, training):
         lambda images, labels: (prepare_image(images, mode), labels),
         num_parallel_calls=tf.data.AUTOTUNE)
     return dataset.prefetch(tf.data.AUTOTUNE)
+
+
+def get_datasets(config):
+    """Return train_ds, val_ds, test_ds, class_names and class_weights."""
+    seed = config["seed"]
+    names = config["class_names"]
+    tf.keras.utils.set_random_seed(seed)
+    table = load_splits(config["split"]["splits_csv"])
+    train = table[table["split"] == "train"]
+    val = table[table["split"] == "val"]
+    test = table[table["split"] == "test"]
+    train = take_subset(train, config["subset"]["train_fraction"], seed)
+    val = take_subset(val, config["subset"]["val_fraction"], seed)
+
+    method = config["imbalance"]["method"]
+    if method not in ["none", "class_weights", "oversample"]:
+        raise ValueError(f"Unknown imbalance method: {method}")
+    class_weights = None
+    if method == "class_weights":
+        class_weights = compute_class_weights(train, names)
+    if method == "oversample":
+        train = oversample(train, seed)
+
+    train_ds = make_dataset(train, config, training=True)
+    val_ds = make_dataset(val, config, training=False)
+    test_ds = make_dataset(test, config, training=False)
+    return train_ds, val_ds, test_ds, names, class_weights
