@@ -24,3 +24,14 @@ subset:
 
 imbalance:
   method: class_weights  # none, class_weights or oversample
+
+pipeline:
+  batch_size: 32
+  cache: true
+  shuffle_buffer: 2048
+
+augmentation:
+  enabled: true
+  horizontal_flip: true
+  rotation: 0.03  # fraction of a full circle, about ±11 degrees
+  zoom: 0.1       # up to 10% in or out

@@ -223,3 +223,58 @@ def oversample(train_table, seed):
         parts.extend([group, extra])
     balanced = pd.concat(parts)
     return balanced.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+
+def build_augmentation(settings, seed):
+    """Return the random transforms chosen in the config (no vertical flip)."""
+    layers = []
+    if settings["horizontal_flip"]:
+        layers.append(tf.keras.layers.RandomFlip("horizontal", seed=seed))
+    if settings["rotation"] > 0:
+        layers.append(tf.keras.layers.RandomRotation(
+            settings["rotation"], fill_mode="constant", seed=seed + 1))
+    if settings["zoom"] > 0:
+        layers.append(tf.keras.layers.RandomZoom(
+            settings["zoom"], fill_mode="constant", seed=seed + 2))
+    return layers
+
+
+def augment_batch(images, layers):
+    """Apply every random transform to a batch of images."""
+    images = tf.cast(images, tf.float32)
+    for layer in layers:
+        images = layer(images, training=True)
+    return images
+
+
+def make_dataset(table, config, training):
+    """Build a batched tf.data pipeline of (images, one-hot labels)."""
+    seed = config["seed"]
+    names = config["class_names"]
+    settings = config["pipeline"]
+    size = config["preprocessing"]["image_size"]
+    mode = config["preprocessing"]["mode"]
+    if training:
+        table = table.sample(frac=1, random_state=seed)
+    root = Path(config["dataset"]["image_dir"])
+    paths = [str(root / path) for path in table["filepath"]]
+    indices = [names.index(label) for label in table["label"]]
+    labels = tf.one_hot(indices, len(names))
+
+    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
+    dataset = dataset.map(
+        lambda path, label: (load_image(path, size), label),
+        num_parallel_calls=tf.data.AUTOTUNE)
+    if settings["cache"]:
+        dataset = dataset.cache()
+    if training:
+        dataset = dataset.shuffle(settings["shuffle_buffer"], seed=seed)
+    dataset = dataset.batch(settings["batch_size"])
+    if training and config["augmentation"]["enabled"]:
+        layers = build_augmentation(config["augmentation"], seed)
+        dataset = dataset.map(
+            lambda images, labels: (augment_batch(images, layers), labels))
+    dataset = dataset.map(
+        lambda images, labels: (prepare_image(images, mode), labels),
+        num_parallel_calls=tf.data.AUTOTUNE)
+    return dataset.prefetch(tf.data.AUTOTUNE)
