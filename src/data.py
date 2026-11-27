@@ -25,3 +25,35 @@ def index_files(root):
                 "md5": file_hash(path),
             })
     return pd.DataFrame(rows)
+
+
+def parse_filename(name):
+    """Return (label, patient_id) from CLASS-PATIENTID-IMAGENUMBER.jpeg."""
+    parts = Path(name).stem.split("-")
+    if len(parts) != 3:
+        raise ValueError(f"Unexpected file name: {name}")
+    return parts[0], parts[1]
+
+
+def build_image_table(image_dir):
+    """Return one row per image with its path, hash, label and patient ID."""
+    table = index_files(image_dir)
+    table = table[table["name"].str.endswith(".jpeg")].reset_index(drop=True)
+    parsed = [parse_filename(name) for name in table["name"]]
+    table["label"] = [label for label, _ in parsed]
+    table["patient_id"] = [patient for _, patient in parsed]
+    folders = [Path(path).parent.name for path in table["relpath"]]
+    if not (table["label"] == folders).all():
+        raise ValueError("A file name and its folder disagree on the class")
+    return table
+
+
+def print_class_summary(table):
+    """Print images and patients per class, and patients with several classes."""
+    summary = table.groupby("label").agg(
+        images=("name", "size"), patients=("patient_id", "nunique"))
+    print(summary)
+    classes = table.groupby("patient_id")["label"].nunique()
+    print("Total images:", len(table))
+    print("Unique patient IDs:", len(classes))
+    print("Patient IDs in more than one class:", (classes > 1).sum())
