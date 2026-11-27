@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
+import tensorflow as tf
 from PIL import Image
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -164,3 +165,34 @@ def load_splits(path):
     table = pd.read_csv(path, dtype={"patient_id": str})
     check_no_patient_overlap(table)
     return table
+
+
+def load_image(path, image_size):
+    """Read an image as a grayscale uint8 tensor (size, size, 1)."""
+    raw = tf.io.read_file(path)
+    image = tf.io.decode_image(raw, channels=3, expand_animations=False)
+    image = tf.image.rgb_to_grayscale(image)
+    image = tf.image.resize(image, (image_size, image_size), antialias=True)
+    image = tf.cast(tf.round(image), tf.uint8)
+    image.set_shape((image_size, image_size, 1))
+    return image
+
+
+def prepare_image(image, mode):
+    """Make 3 float channels and apply the scaling the model expects."""
+    image = tf.image.grayscale_to_rgb(tf.cast(image, tf.float32))
+    if mode == "none":
+        return image
+    if mode == "rescale":
+        return image / 255.0
+    if mode == "vgg16":
+        return tf.keras.applications.vgg16.preprocess_input(image)
+    if mode == "resnet50":
+        return tf.keras.applications.resnet50.preprocess_input(image)
+    raise ValueError(f"Unknown preprocessing mode: {mode}")
+
+
+def preprocess_single_image(path, image_size, mode):
+    """Turn one raw image file into a model-ready batch of one."""
+    image = prepare_image(load_image(path, image_size), mode)
+    return tf.expand_dims(image, axis=0)

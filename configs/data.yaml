@@ -10,3 +10,7 @@ split:
   val_folds: 3
   test_folds: 3
   splits_csv: data/splits.csv
+
+preprocessing:
+  image_size: 224
+  mode: none  # none, rescale, vgg16 or resnet50
