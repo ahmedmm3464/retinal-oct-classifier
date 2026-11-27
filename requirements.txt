@@ -1,0 +1,6 @@
+tensorflow==2.21.0
+pandas==2.2.3
+pillow==11.3.0
+pyyaml==6.0.3
+scikit-learn==1.8.0
+kaggle==2.2.5
