@@ -196,3 +196,30 @@ def preprocess_single_image(path, image_size, mode):
     """Turn one raw image file into a model-ready batch of one."""
     image = prepare_image(load_image(path, image_size), mode)
     return tf.expand_dims(image, axis=0)
+
+
+def take_subset(table, fraction, seed):
+    """Keep the same random fraction of every class."""
+    if fraction == 1.0:
+        return table
+    return table.groupby("label").sample(frac=fraction, random_state=seed)
+
+
+def compute_class_weights(train_table, class_names):
+    """Return {class index: weight}, using training rows only."""
+    counts = train_table["label"].value_counts()
+    total = len(train_table)
+    return {index: float(total / (len(class_names) * counts[name]))
+            for index, name in enumerate(class_names)}
+
+
+def oversample(train_table, seed):
+    """Repeat random rows until every class is as big as the largest one."""
+    largest = train_table["label"].value_counts().max()
+    parts = []
+    for _, group in train_table.groupby("label"):
+        extra = group.sample(largest - len(group), replace=True,
+                             random_state=seed)
+        parts.extend([group, extra])
+    balanced = pd.concat(parts)
+    return balanced.sample(frac=1, random_state=seed).reset_index(drop=True)

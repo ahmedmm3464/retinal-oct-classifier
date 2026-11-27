@@ -14,3 +14,13 @@ split:
 preprocessing:
   image_size: 224
   mode: none  # none, rescale, vgg16 or resnet50
+
+seed: 42
+class_names: [CNV, DME, DRUSEN, NORMAL]
+
+subset:
+  train_fraction: 1.0  # for example 0.2 for faster runs
+  val_fraction: 1.0
+
+imbalance:
+  method: class_weights  # none, class_weights or oversample
