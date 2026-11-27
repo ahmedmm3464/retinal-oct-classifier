@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
+from PIL import Image
 
 
 def file_hash(path):
@@ -57,3 +58,44 @@ def print_class_summary(table):
     print("Total images:", len(table))
     print("Unique patient IDs:", len(classes))
     print("Patient IDs in more than one class:", (classes > 1).sum())
+
+
+def inspect_image(path):
+    """Return (width, height, color_mode, is_ok) for one image file."""
+    try:
+        with Image.open(path) as image:
+            image.load()
+            return image.width, image.height, image.mode, True
+    except (OSError, SyntaxError, ValueError):
+        return 0, 0, "", False
+
+
+def add_image_info(table, image_dir):
+    """Return a copy of the table with size, color mode and readable flag."""
+    info = [inspect_image(Path(image_dir) / path) for path in table["relpath"]]
+    columns = ["width", "height", "color_mode", "is_ok"]
+    return table.join(pd.DataFrame(info, columns=columns, index=table.index))
+
+
+def find_duplicates(table):
+    """Return one row for each group of byte-identical files."""
+    repeated = table[table.duplicated("md5", keep=False)]
+    return repeated.groupby("md5").agg(
+        copies=("name", "size"),
+        labels=("label", "nunique"),
+        patients=("patient_id", "nunique"))
+
+
+def print_quality_summary(table):
+    """Print corrupted files, color modes, image sizes and duplicates."""
+    readable = table[table["is_ok"]]
+    print("Corrupted files:", (~table["is_ok"]).sum())
+    print("Color modes:", readable["color_mode"].value_counts().to_dict())
+    sizes = readable.groupby(["width", "height"]).size()
+    print("Different image sizes:", len(sizes))
+    print(sizes.sort_values(ascending=False).head(10))
+    groups = find_duplicates(table)
+    print("Duplicate groups:", len(groups))
+    print("Extra copies:", (groups["copies"] - 1).sum())
+    print("Groups with different labels:", (groups["labels"] > 1).sum())
+    print("Groups with different patient IDs:", (groups["patients"] > 1).sum())
