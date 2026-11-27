@@ -1,0 +1,37 @@
+dataset:
+  kaggle_id: paultimothymooney/kermany2018
+  raw_dir: data/raw
+  # The folder name ends with a space. The second copy holds identical images.
+  image_dir: "data/raw/OCT2017 "
+
+split:
+  seed: 42
+  n_folds: 20
+  val_folds: 3
+  test_folds: 3
+  splits_csv: data/splits.csv
+
+preprocessing:
+  image_size: 224
+  mode: none  # none, rescale, vgg16 or resnet50
+
+seed: 42
+class_names: [CNV, DME, DRUSEN, NORMAL]
+
+subset:
+  train_fraction: 1.0  # for example 0.2 for faster runs
+  val_fraction: 1.0
+
+imbalance:
+  method: class_weights  # none, class_weights or oversample
+
+pipeline:
+  batch_size: 32
+  cache: true
+  shuffle_buffer: 2048
+
+augmentation:
+  enabled: true
+  horizontal_flip: true
+  rotation: 0.03  # fraction of a full circle, about ±11 degrees
+  zoom: 0.1       # up to 10% in or out

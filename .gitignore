@@ -8,6 +8,7 @@ data/*
 !data/.gitkeep
 !data/README.md
 !data/*.py
+!data/splits.csv
 
 .DS_Store
 Thumbs.db
