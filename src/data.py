@@ -99,3 +99,16 @@ def print_quality_summary(table):
     print("Extra copies:", (groups["copies"] - 1).sum())
     print("Groups with different labels:", (groups["labels"] > 1).sum())
     print("Groups with different patient IDs:", (groups["patients"] > 1).sum())
+
+
+def clean_table(table):
+    """Return the table without broken files, label conflicts or extra copies."""
+    readable = table[table["is_ok"]]
+    labels_per_hash = readable.groupby("md5")["label"].transform("nunique")
+    consistent = readable[labels_per_hash == 1]
+    cleaned = consistent.drop_duplicates("md5").reset_index(drop=True)
+    print("Removed broken files:", len(table) - len(readable))
+    print("Removed label conflicts:", len(readable) - len(consistent))
+    print("Removed extra copies:", len(consistent) - len(cleaned))
+    print("Images kept:", len(cleaned))
+    return cleaned
