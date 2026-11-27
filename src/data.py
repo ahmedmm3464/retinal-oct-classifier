@@ -1,10 +1,12 @@
 """Data loading, cleaning, splitting and preprocessing for the OCT project."""
 
+import argparse
 import hashlib
 from pathlib import Path
 
 import pandas as pd
 import tensorflow as tf
+import yaml
 from PIL import Image
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -305,3 +307,45 @@ def get_datasets(config):
     val_ds = make_dataset(val, config, training=False)
     test_ds = make_dataset(test, config, training=False)
     return train_ds, val_ds, test_ds, names, class_weights
+
+
+def print_original_overlap(table):
+    """Show how many original test patients are also in the original train."""
+    folder = table["relpath"].str.split("/").str[0]
+    train_ids = set(table.loc[folder == "train", "patient_id"])
+    test_ids = set(table.loc[folder == "test", "patient_id"])
+    print("Original test patients:", len(test_ids))
+    print("...also in original train:", len(train_ids & test_ids))
+
+
+def prepare_splits(config):
+    """Audit, clean and split the raw images, then save splits.csv."""
+    image_dir = config["dataset"]["image_dir"]
+    settings = config["split"]
+    table = build_image_table(image_dir)
+    print_class_summary(table)
+    print_original_overlap(table)
+    table = add_image_info(table, image_dir)
+    print_quality_summary(table)
+    table = clean_table(table)
+    print_class_summary(table)
+    table = assign_splits(
+        table, settings["n_folds"], settings["val_folds"],
+        settings["test_folds"], settings["seed"])
+    check_no_patient_overlap(table)
+    print_split_summary(table)
+    save_splits(table, settings["splits_csv"])
+    print("Saved", settings["splits_csv"])
+
+
+def main():
+    """Read the config file and create splits.csv."""
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--config", required=True, help="path to a YAML config")
+    args = parser.parse_args()
+    with open(args.config) as file:
+        prepare_splits(yaml.safe_load(file))
+
+
+if __name__ == "__main__":
+    main()
