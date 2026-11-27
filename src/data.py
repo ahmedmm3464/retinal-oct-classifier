@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from PIL import Image
+from sklearn.model_selection import StratifiedGroupKFold
 
 
 def file_hash(path):
@@ -112,3 +113,54 @@ def clean_table(table):
     print("Removed extra copies:", len(consistent) - len(cleaned))
     print("Images kept:", len(cleaned))
     return cleaned
+
+
+def assign_splits(table, n_folds, val_folds, test_folds, seed):
+    """Add a split column, keeping each patient ID in exactly one split."""
+    splitter = StratifiedGroupKFold(
+        n_splits=n_folds, shuffle=True, random_state=seed)
+    folds = splitter.split(table, table["label"], groups=table["patient_id"])
+    result = table.assign(split="train")
+    for number, (_, rows) in enumerate(folds):
+        if number < test_folds:
+            result.loc[result.index[rows], "split"] = "test"
+        elif number < test_folds + val_folds:
+            result.loc[result.index[rows], "split"] = "val"
+    return result
+
+
+def check_no_patient_overlap(table):
+    """Stop with an error if a split is empty or two splits share a patient."""
+    ids = {name: set(table.loc[table["split"] == name, "patient_id"])
+           for name in ["train", "val", "test"]}
+    assert all(ids.values()), "A split is empty"
+    assert not ids["train"] & ids["val"], "Patients shared by train and val"
+    assert not ids["train"] & ids["test"], "Patients shared by train and test"
+    assert not ids["val"] & ids["test"], "Patients shared by val and test"
+
+
+def print_split_summary(table):
+    """Print images, class percentages and patients for each split."""
+    order = ["train", "val", "test"]
+    images = pd.crosstab(table["label"], table["split"])[order]
+    print("Images per class:\n", images)
+    print("Class % inside each split:\n",
+          (images / images.sum() * 100).round(2))
+    print("Split % of all images:\n",
+          (images.sum() / len(table) * 100).round(2))
+    print("Patients per split:\n",
+          table.groupby("split")["patient_id"].nunique()[order])
+
+
+def save_splits(table, path):
+    """Save filepath, label, patient_id and split to a CSV file."""
+    renamed = table.rename(columns={"relpath": "filepath"})
+    columns = ["filepath", "label", "patient_id", "split"]
+    renamed[columns].to_csv(path, index=False)
+
+
+def load_splits(path):
+    """Read splits.csv with text patient IDs and check for leakage again."""
+    table = pd.read_csv(path, dtype={"patient_id": str})
+    check_no_patient_overlap(table)
+    return table

@@ -3,3 +3,10 @@ dataset:
   raw_dir: data/raw
   # The folder name ends with a space. The second copy holds identical images.
   image_dir: "data/raw/OCT2017 "
+
+split:
+  seed: 42
+  n_folds: 20
+  val_folds: 3
+  test_folds: 3
+  splits_csv: data/splits.csv
